@@ -1,24 +1,29 @@
 import User from "../models/user.js";
-// bcrypt for hashing
+// bcrypt is used for hashing passwords securely
 import bcrypt from 'bcrypt'
-// JWT
+// JWT (JSON Web Token) is used for login authentication
 import jwt from 'jsonwebtoken'
 
+// Create User (Register)
 export function createUser(req, res) {
 
-    // Hashing                                         10 salting rounds
+    // Hash the user's password before saving it
+    // 10 = number of salt rounds (recommended for security)
     const hashedPassword = bcrypt.hashSync(req.body.password,10)
 
+    // Creating a new User object using data sent from frontend
     const user = new User(
         {
             email : req.body.email,
             firstName : req.body.firstName,
             lastName : req.body.lastName,
-            // use the hashing name
+
+            // Save hashed password instead of plain text
             password : hashedPassword,
         }
     )
 
+    // Save user to the database
     user.save().then(
 
         ()=>{
@@ -39,9 +44,10 @@ export function createUser(req, res) {
 }
 
 
-
+// Login User
 export function loginUser(req, res){
     
+    // Check if a user exists with the given email
     User.findOne(
         {
             email : req.body.email
@@ -50,17 +56,21 @@ export function loginUser(req, res){
         (user)=>{
             console.log(user)
 
+            // If no user found, return error
             if(user == null){
                 res.json({
                     message : "User with given email not found"
                 })
             } else{
 
+                // Compare entered password with stored hashed password
                 const isPasswordValid = bcrypt.compareSync(req.body.password, user.password)
 
                 if(isPasswordValid){
 
-                    // create a jwt 
+                    // Create a JWT token for the logged-in user
+                    // This token stores user's information
+                    // NEVER store password inside a token
                     const token = jwt.sign({
                         email : user.email,
                         firstName : user.firstName,
@@ -68,13 +78,16 @@ export function loginUser(req, res){
                         role : user.role,
                         image: user.image,
                         isEmailVerified : user.isEmailVerified,
+                        // ❗ Replace this with environment variable later
                     }, "i-computers54!")
 
+                    // Send success + token to frontend
                     res.json({
                         message : "Login successful",
                         token: token
                     })
                 }else{
+                    // Password incorrect
                     res.status(401).json({
                         message : "Invalid password"
                     })
@@ -83,6 +96,7 @@ export function loginUser(req, res){
         }
     ).catch(
         ()=>{
+            // Something went wrong in server/database
             res.status(500).json({
             message : "Internal server error"
             })
@@ -90,6 +104,8 @@ export function loginUser(req, res){
     )
 }
 
+
+// Check if Logged-in User is Admin
 export function isAdmin(req){
 
     // check in the request there is a user or not

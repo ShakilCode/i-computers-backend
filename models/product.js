@@ -1,14 +1,16 @@
 import mongoose from "mongoose";
 
+// Creating Product Schema
+// This schema defines how each product document will look in MongoDB.
 const productSchema = new mongoose.Schema(
     {
-        // every product has a unique ID to understand
+        // Unique ID for the product (not MongoDB _id — this is your own custom ID)
         // This is the primary key of product
+        // must be provided
+        // no two products can have same productId
         productId: {
             type: String,
-            // ID is mandatory
             required: true,
-            // from one ID there should be only one porduct
             unique: true
         },
 
@@ -24,62 +26,67 @@ const productSchema = new mongoose.Schema(
             required: true
         },
 
-        // alternative names(extra names)
+        // Alternative names or nicknames for the product
+        // string array because it may have more than 1 name (e.g., ["CPU", "Precessesor"])
+        // empty array if no alternative names
         altNames: {
-            // string array because it may have more than 1 name
             type: [String],
-            // default empty array
             default: []
         },
 
-        // every product has a price and its mandatory
+        // every product has a selling price and its mandatory
         price: {
             type: Number,
             required: true
         },
 
         // labelled a price and cut it because selling price is differnt than this
+        // Useful when showing “discounted price”
         labelledPrice: {
             type: Number
         },
 
         // every product has a category
+        // if no cateogry then it goes to others
         category: {
             type: String,
-            // if no cateogry then it goes to others
+
             default: "Others"
         },
 
-        // a product has many images and never save images in DB
+        // Product images – we never store the actual image file in DB,
+        // only the image URLs or file paths.
+        // there are more images it means its an string array or links array
         images: {
             type: [String],
-            // only image links we put to the DB
-            // there are more images it means its an string array or links array
             default: ["/images/default-product-1.png", "/images/default-product-2.png"]
         },
 
-        // need to disable some products for some seasons (in stock, out of stock)
+        // Show or hide product on website (useful for out-of-stock/seasonal items)
         isVisible: {
             type: Boolean,
             default: true,
             required: true
         },
 
-        // some product has a brand like asus, mac
+        // Brand name of the product (e.g., ASUS, Apple, Nike)
+        // there is no brand then we put Generic
         brand: {
             type: String,
-            // there is no brand then we put Generic
             default: "Generic"
         },
 
+        // Model name of the product
+        // if htere is no model then we put Standard
         model: {
             type: String,
-            // if htere is no model then we put Standard
             default: "Standard"
         }
     }
 )
 
+// Convert schema into a model to interact with MongoDB
 const Product = mongoose.model("Product", productSchema)
 
+// Export model so it can be used in routes/controllers
 export default Product
