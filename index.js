@@ -5,11 +5,14 @@ import mongoose from 'mongoose'
 import userRouter from './router/userRouter.js'
 import productRouter from './router/productRouter.js'
 import authorizeUser from './lib/jwtMiddleware.js'
+import cors from 'cors'
+import dotenv from 'dotenv'
 
+dotenv.config()
 
 
 // MongoDB URI
-const mongoURI = "mongodb+srv://admin:1234@cluster0.aaztane.mongodb.net/?appName=Cluster0"
+const mongoURI = process.env.MONGO_URI
 
 // connect out backend with the database
 mongoose.connect(mongoURI).then(
@@ -25,6 +28,9 @@ mongoose.connect(mongoURI).then(
 // Assign the express backend to a variable 
 const app = express()
 
+// cors middleware
+app.use(cors())
+
 // Body Parser to make HHTP req to proper req and send to the proper request without messed
 app.use(express.json())
 
@@ -32,10 +38,10 @@ app.use(express.json())
 app.use(authorizeUser)
 
 // Connect the user router
-app.use("/users", userRouter)
+app.use("/api/users", userRouter)
 
 // Connect the product router
-app.use("/products", productRouter)
+app.use("/api/products", productRouter)
 
 // Start the server and make it listed for incoming requests on a specified port
 app.listen(3000,
@@ -44,5 +50,3 @@ app.listen(3000,
         console.log("Server is running on port 3000")
     }
 )
-
-

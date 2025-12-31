@@ -3,6 +3,9 @@ import User from "../models/user.js";
 import bcrypt from 'bcrypt'
 // JWT (JSON Web Token) is used for login authentication
 import jwt from 'jsonwebtoken'
+import dotenv from 'dotenv'
+
+dotenv.config()
 
 // Create User (Register)
 export function createUser(req, res) {
@@ -58,7 +61,7 @@ export function loginUser(req, res){
 
             // If no user found, return error
             if(user == null){
-                res.json({
+                res.status(404).json({
                     message : "User with given email not found"
                 })
             } else{
@@ -78,13 +81,14 @@ export function loginUser(req, res){
                         role : user.role,
                         image: user.image,
                         isEmailVerified : user.isEmailVerified,
-                        // ❗ Replace this with environment variable later
-                    }, "i-computers54!")
+                        // Replace this with environment variable later
+                    }, process.env.JWT_SECRET)
 
                     // Send success + token to frontend
                     res.json({
                         message : "Login successful",
-                        token: token
+                        token: token,
+                        role: user.role
                     })
                 }else{
                     // Password incorrect
