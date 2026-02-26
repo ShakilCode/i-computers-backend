@@ -57,7 +57,6 @@ export function loginUser(req, res){
         }
     ).then(
         (user)=>{
-            console.log(user)
 
             // If no user found, return error
             if(user == null){

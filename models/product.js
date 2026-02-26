@@ -82,6 +82,10 @@ const productSchema = new mongoose.Schema(
             type: String,
             default: "Standard"
         }
+        // qty : {
+        //     type : Number,
+        //     default : 100
+        // }
     }
 )
 
