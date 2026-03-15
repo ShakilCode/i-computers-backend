@@ -1,5 +1,5 @@
 import express from 'express'
-import { createUser, loginUser } from '../controllers/userController.js'
+import { changeUserPassword, createUser, getUser, loginUser, updateUserProfile } from '../controllers/userController.js'
 
 // Create a new router object
 const userRouter = express.Router()
@@ -17,6 +17,9 @@ userRouter.post("/", createUser)
 // When a POST request is sent to /users/login,
 // it calls the loginUser controller function.
 userRouter.post("/login", loginUser)
+userRouter.post("/update-password", changeUserPassword)
+userRouter.put("/", updateUserProfile)
+userRouter.get("/profile",getUser)
 
 // Export router so index.js can use it
 export default userRouter
