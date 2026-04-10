@@ -1,5 +1,5 @@
 import express from 'express'
-import { createProduct, deleteProduct, getProductById, getProducts, updateProduct } from '../controllers/productController.js'
+import { createProduct, deleteProduct, getProductById, getProducts, searchProducts, updateProduct } from '../controllers/productController.js'
 
 const productRouter = express.Router()
 
@@ -11,6 +11,7 @@ productRouter.post("/", createProduct)
 // Method: GET
 // URL: /products
 productRouter.get("/", getProducts)
+productRouter.get("/search/:query", searchProducts);
 
 // Delete a product by ID
 // Method: DELETE

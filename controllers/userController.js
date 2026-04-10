@@ -78,6 +78,15 @@ export function loginUser(req, res){
                     message : "User with given email not found"
                 })
             } else{
+				if (user.isBlocked) {
+					res
+						.status(403)
+						.json({
+							message:
+								"Your account is blocked. Please contact support for more information.",
+						});
+					return;
+				}
 
                 // Compare entered password with stored hashed password
                 const isPasswordValid = bcrypt.compareSync(req.body.password, user.password)
@@ -373,5 +382,115 @@ export async function googleLogin(req, res) {
 		res
 			.status(500)
 			.json({ message: "Error logging in with Google", error: error });
+	}
+}
+
+// get all users
+export async function getAllUsers(req, res) {
+	if (!isAdmin(req)) {
+		res.status(403).json({
+			message: "Forbidden",
+		});
+		return;
+	}
+	try {
+		const pageSizeInString = req.params.pageSize || "10";
+
+		const pageNumberInString = req.params.pageNumber || "1";
+
+		const pageSize = parseInt(pageSizeInString);
+
+		const pageNumber = parseInt(pageNumberInString);
+
+		const numberOfUsers = await User.countDocuments();
+
+		const numberOfPages = Math.ceil(numberOfUsers / pageSize);
+
+		const users = await User.find({})
+			.skip((pageNumber - 1) * pageSize)
+			.limit(pageSize);
+
+		res.json({
+			users: users,
+			totalPages: numberOfPages,
+		});
+	} catch (error) {
+		res.status(500).json({ message: "Error getting users", error: error });
+	}
+}
+
+// block user or unblock user
+export async function blockOrUnblockUser(req, res) {
+	if (!isAdmin(req)) {
+		res.status(403).json({
+			message: "Forbidden",
+		});
+		return;
+	}
+
+	const email = req.body.email;
+
+	if (req.user.email == email) {
+		res.status(400).json({
+			message: "You cannot block yourself",
+		});
+		return;
+	}
+	try {
+		const user = await User.findOne({ email: email });
+
+		if (user == null) {
+			res.status(404).json({ message: "User with given email not found" });
+			return;
+		}
+		await User.updateOne({ email: email }, { isBlocked: !user.isBlocked });
+		res.json({
+			message: user.isBlocked
+				? "User unblocked successfully"
+				: "User blocked successfully",
+		});
+	} catch (error) {
+		res
+			.status(500)
+			.json({ message: "Error blocking/unblocking user", error: error });
+	}
+}
+
+// change the role 
+export async function changeRole(req, res) {
+	if (!isAdmin(req)) {
+		res.status(403).json({
+			message: "Forbidden",
+		});
+		return;
+	}
+
+	const email = req.body.email;
+
+	if (req.user.email == email) {
+		res.status(400).json({
+			message: "You cannot change your own role",
+		});
+		return;
+	}
+	try {
+		const user = await User.findOne({ email: email });
+
+		if (user == null) {
+			res.status(404).json({ message: "User with given email not found" });
+			return;
+		}
+		await User.updateOne(
+			{ email: email },
+			{ role: user.role == "admin" ? "customer" : "admin" },
+		);
+		res.json({
+			message:
+				user.role == "admin"
+					? "User role changed to customer successfully"
+					: "User role changed to admin successfully",
+		});
+	} catch (error) {
+		res.status(500).json({ message: "Error changing user role", error: error });
 	}
 }
