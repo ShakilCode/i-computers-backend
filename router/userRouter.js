@@ -1,5 +1,5 @@
 import express from 'express'
-import { blockOrUnblockUser, changeRole, changeUserPassword, createUser, getAllUsers, getUser, googleLogin, loginUser, sendOTP, updateUserProfile, verifyOTP } from '../controllers/userController.js'
+import { blockOrUnblockUser, changeRole, changeUserPassword, createUser, getAllUsers, getUser, googleLogin, loginUser, sendOTP, updateUserProfile, verifyOTP, contactUs } from '../controllers/userController.js'
 
 // Create a new router object
 const userRouter = express.Router()
@@ -20,6 +20,7 @@ userRouter.post("/login", loginUser)
 userRouter.post("/update-password", changeUserPassword)
 userRouter.post("/send-otp",sendOTP)
 userRouter.post("/verify-otp",verifyOTP)
+userRouter.post("/contact-us", contactUs);
 userRouter.post("/google-login", googleLogin)
 userRouter.post("/toggle-block", blockOrUnblockUser)
 userRouter.post("/toggle-role", changeRole)

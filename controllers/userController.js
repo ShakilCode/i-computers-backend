@@ -1,4 +1,5 @@
 import User from "../models/user.js";
+import ContactUs from "../models/contactUs.js";
 // bcrypt is used for hashing passwords securely
 import bcrypt from 'bcrypt'
 // JWT (JSON Web Token) is used for login authentication
@@ -7,6 +8,7 @@ import dotenv from 'dotenv'
 import OTP from "../models/otp.js";
 import nodemailer from "nodemailer";
 import axios from "axios";
+import validator from "validator";
 
 dotenv.config()
 
@@ -20,6 +22,21 @@ const transporter = nodemailer.createTransport({
 		pass: process.env.GMAIL_APP_PASSWORD,
 	},
 });
+
+// Escape user-provided values before inserting them into HTML email
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => {
+        const entities = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+        };
+
+        return entities[char];
+    });
+}
 
 // Create User (Register)
 export function createUser(req, res) {
@@ -270,6 +287,403 @@ export async function sendOTP(req, res) {
 	} catch (error) {
 		res.status(500).json({ message: "Error sending OTP", error: error });
 	}
+}
+
+// Contact Us
+export async function contactUs(req, res) {
+    try {
+        const { name, email, subject, message } = req.body;
+
+        // 1. Validate required fields
+        if (
+            typeof name !== "string" ||
+            typeof email !== "string" ||
+            typeof subject !== "string" ||
+            typeof message !== "string" ||
+            !name.trim() ||
+            !email.trim() ||
+            !subject.trim() ||
+            !message.trim()
+        ) {
+            return res.status(400).json({
+                message: "All fields are required",
+            });
+        }
+
+        // 2. Normalize user input
+        const cleanName = name.trim();
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanSubject = subject.trim();
+        const cleanMessage = message.trim();
+
+        // 3. Validate name
+        if (cleanName.length < 2 || cleanName.length > 100) {
+            return res.status(400).json({
+                message: "Name must be between 2 and 100 characters",
+            });
+        }
+
+        // 4. Validate email
+        if (
+            !validator.isEmail(cleanEmail, {
+                allow_display_name: false,
+                require_tld: true,
+            })
+        ) {
+            return res.status(400).json({
+                message: "Please enter a valid email address",
+            });
+        }
+
+        // 5. Detect common email domain typos
+        const emailDomain = cleanEmail.split("@")[1];
+
+        const commonDomainCorrections = {
+            "gmail.co": "gmail.com",
+            "gmail.con": "gmail.com",
+            "gmai.com": "gmail.com",
+            "gmial.com": "gmail.com",
+            "hotmai.com": "hotmail.com",
+            "hotmail.co": "hotmail.com",
+            "yahoo.co": "yahoo.com",
+            "yaho.com": "yahoo.com",
+            "outlook.co": "outlook.com",
+        };
+
+        if (commonDomainCorrections[emailDomain]) {
+            return res.status(400).json({
+                message: `Did you mean ${commonDomainCorrections[emailDomain]}? Please check your email address.`,
+            });
+        }
+
+        // 6. Validate subject
+        if (
+            cleanSubject.length < 3 ||
+            cleanSubject.length > 150
+        ) {
+            return res.status(400).json({
+                message: "Subject must be between 3 and 150 characters",
+            });
+        }
+
+        // 7. Validate message
+        if (
+            cleanMessage.length < 10 ||
+            cleanMessage.length > 5000
+        ) {
+            return res.status(400).json({
+                message: "Message must be between 10 and 5000 characters",
+            });
+        }
+
+        // 8. Save enquiry to MongoDB
+        const newContact = new ContactUs({
+            name: cleanName,
+            email: cleanEmail,
+            subject: cleanSubject,
+            message: cleanMessage,
+        });
+
+        await newContact.save();
+
+        // 9. Configure email addresses
+        // Use an address you own or are authorized to send from.
+        const adminEmail = "shakilahamadqa@gmail.com";
+        const senderEmail = "shakilahamadqa@gmail.com";
+
+        // Prevent line breaks in the email subject.
+        const emailSubject = cleanSubject
+            .replace(/[\r\n]+/g, " ")
+            .slice(0, 150);
+
+        // Escape customer input for HTML.
+        const safeName = escapeHtml(cleanName);
+        const safeEmail = escapeHtml(cleanEmail);
+        const safeSubject = escapeHtml(cleanSubject);
+        const safeMessage = escapeHtml(cleanMessage);
+        const safeCreatedAt = escapeHtml(
+            newContact.createdAt.toISOString()
+        );
+        const safeEnquiryId = escapeHtml(
+            newContact._id.toString()
+        );
+
+        // 10. Prepare professional email
+        const mailOptions = {
+            from: {
+                name: "I Computers | Customer Enquiries",
+                address: senderEmail,
+            },
+
+            to: adminEmail,
+
+            // Clicking Reply sends the response to the customer.
+            replyTo: {
+                name: cleanName,
+                address: cleanEmail,
+            },
+
+            subject: `New Customer Enquiry | I Computers - ${emailSubject}`,
+
+            // Plain-text version
+            text: [
+                "I COMPUTERS - CUSTOMER ENQUIRY",
+                "================================",
+                "",
+                "A new enquiry has been submitted through the I Computers website.",
+                "",
+                `Customer Name: ${cleanName}`,
+                `Customer Email: ${cleanEmail}`,
+                `Enquiry Subject: ${cleanSubject}`,
+                "",
+                "CUSTOMER MESSAGE",
+                "----------------",
+                cleanMessage,
+                "",
+                `Submitted At: ${newContact.createdAt.toISOString()}`,
+                `Enquiry ID: ${newContact._id}`,
+                "",
+                "Reply directly to this email to respond to the customer.",
+            ].join("\n"),
+
+            // HTML version
+            html: `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport"
+                        content="width=device-width, initial-scale=1.0">
+                    <title>I Computers Customer Enquiry</title>
+                </head>
+
+                <body style="
+                    margin: 0;
+                    padding: 24px 12px;
+                    background-color: #f3f4f6;
+                    font-family: Arial, Helvetica, sans-serif;
+                    color: #1f2937;
+                ">
+                    <div style="
+                        max-width: 680px;
+                        margin: 0 auto;
+                        background-color: #ffffff;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 10px;
+                        overflow: hidden;
+                    ">
+                        <div style="
+                            padding: 26px 30px;
+                            background-color: #1d4ed8;
+                            color: #ffffff;
+                        ">
+                            <p style="
+                                margin: 0 0 8px;
+                                font-size: 12px;
+                                letter-spacing: 1.5px;
+                                text-transform: uppercase;
+                            ">
+                                I Computers
+                            </p>
+
+                            <h1 style="
+                                margin: 0;
+                                font-size: 24px;
+                                line-height: 1.4;
+                            ">
+                                New Customer Enquiry
+                            </h1>
+
+                            <p style="
+                                margin: 10px 0 0;
+                                font-size: 14px;
+                                color: #dbeafe;
+                            ">
+                                A new message has been received from your website.
+                            </p>
+                        </div>
+
+                        <div style="padding: 28px 30px;">
+                            <p style="
+                                margin: 0 0 22px;
+                                font-size: 15px;
+                                line-height: 1.7;
+                            ">
+                                Hello I Computers Team,<br><br>
+                                A customer has submitted an enquiry through
+                                the Contact Us form. Details are provided below.
+                            </p>
+
+                            <table
+                                role="presentation"
+                                cellpadding="0"
+                                cellspacing="0"
+                                width="100%"
+                                style="
+                                    width: 100%;
+                                    border-collapse: collapse;
+                                    font-size: 14px;
+                                "
+                            >
+                                <tr>
+                                    <td style="
+                                        width: 145px;
+                                        padding: 13px;
+                                        border: 1px solid #e5e7eb;
+                                        background: #f9fafb;
+                                        font-weight: bold;
+                                        vertical-align: top;
+                                    ">
+                                        Customer Name
+                                    </td>
+                                    <td style="
+                                        padding: 13px;
+                                        border: 1px solid #e5e7eb;
+                                        overflow-wrap: anywhere;
+                                    ">
+                                        ${safeName}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style="
+                                        padding: 13px;
+                                        border: 1px solid #e5e7eb;
+                                        background: #f9fafb;
+                                        font-weight: bold;
+                                        vertical-align: top;
+                                    ">
+                                        Customer Email
+                                    </td>
+                                    <td style="
+                                        padding: 13px;
+                                        border: 1px solid #e5e7eb;
+                                        overflow-wrap: anywhere;
+                                    ">
+                                        ${safeEmail}
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style="
+                                        padding: 13px;
+                                        border: 1px solid #e5e7eb;
+                                        background: #f9fafb;
+                                        font-weight: bold;
+                                        vertical-align: top;
+                                    ">
+                                        Subject
+                                    </td>
+                                    <td style="
+                                        padding: 13px;
+                                        border: 1px solid #e5e7eb;
+                                        overflow-wrap: anywhere;
+                                    ">
+                                        ${safeSubject}
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <h2 style="
+                                margin: 28px 0 12px;
+                                font-size: 17px;
+                                color: #111827;
+                            ">
+                                Customer Message
+                            </h2>
+
+                            <div style="
+                                padding: 18px;
+                                background-color: #f9fafb;
+                                border-left: 4px solid #2563eb;
+                                border-radius: 4px;
+                                font-size: 14px;
+                                line-height: 1.8;
+                                white-space: pre-wrap;
+                                overflow-wrap: anywhere;
+                            ">${safeMessage}</div>
+
+                            <div style="
+                                margin-top: 26px;
+                                padding-top: 18px;
+                                border-top: 1px solid #e5e7eb;
+                                font-size: 12px;
+                                line-height: 1.8;
+                                color: #6b7280;
+                            ">
+                                <p style="margin: 0 0 5px;">
+                                    <strong>Submitted At:</strong>
+                                    ${safeCreatedAt}
+                                </p>
+
+                                <p style="margin: 0;">
+                                    <strong>Enquiry ID:</strong>
+                                    ${safeEnquiryId}
+                                </p>
+                            </div>
+
+                            <p style="
+                                margin: 24px 0 0;
+                                font-size: 13px;
+                                line-height: 1.7;
+                                color: #4b5563;
+                            ">
+                                <strong>Next step:</strong>
+                                Use the Reply button in your email application
+                                to respond directly to the customer.
+                            </p>
+                        </div>
+
+                        <div style="
+                            padding: 18px 30px;
+                            background-color: #f9fafb;
+                            border-top: 1px solid #e5e7eb;
+                            text-align: center;
+                            font-size: 12px;
+                            color: #6b7280;
+                        ">
+                            This is an automated notification from
+                            the I Computers website Contact Us form.
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `,
+        };
+
+        // 11. Send notification to the admin
+        const info = await transporter.sendMail(mailOptions);
+
+        console.log(
+            "I Computers enquiry email accepted by mail server:",
+            info.messageId
+        );
+
+        // 12. Return success
+        return res.status(201).json({
+            message: "Your message has been submitted successfully",
+            contact: {
+                id: newContact._id,
+                name: newContact.name,
+                email: newContact.email,
+                subject: newContact.subject,
+                createdAt: newContact.createdAt,
+            },
+        });
+    } catch (error) {
+        console.error("Contact Us error:", error);
+
+        if (error.name === "ValidationError") {
+            return res.status(400).json({
+                message: "Please check your submitted details",
+            });
+        }
+
+        return res.status(500).json({
+            message:
+                "We could not complete your request. Your message may already have been saved. Please check before submitting again.",
+        });
+    }
 }
 
 // verify the otp and reset the password
